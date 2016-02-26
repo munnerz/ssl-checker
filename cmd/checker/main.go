@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 	"encoding/json"
+	"sync"
 	"fmt"
 	"encoding/pem"
 	"log"
@@ -46,18 +47,35 @@ func handle(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(http.StatusText(http.StatusInternalServerError)))
 	}
 
-	var statuses []*CertStatus
+	// Create a buffered channel up to len(files)
+	doneChan := make(chan *CertStatus, len(files))
 
+	var wg sync.WaitGroup
 	for _, f := range files {
-		status, err := getCertStatus(f)
+		wg.Add(1)
 
-		if err != nil {
-			log.Printf("Error getting certificate status for: %s", f)
-			continue
-		}
+		go func() {
+			status, err := getCertStatus(f)
 
-		// TODO: Don't abuse append like this!
-		statuses = append(statuses, status)
+			if err != nil {
+				log.Printf("Error getting certificate status for: %s", f)
+			} else {
+				doneChan <- status
+			}
+
+			wg.Done()
+		}()
+	}
+
+	wg.Wait()
+	close(doneChan)
+
+	statuses := make([]*CertStatus, len(doneChan))
+
+	i := 0
+	for s := range doneChan {
+		statuses[i] = s
+		i++
 	}
 
 	err = json.NewEncoder(w).Encode(statuses)
