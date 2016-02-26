@@ -55,17 +55,17 @@ func handle(w http.ResponseWriter, r *http.Request) {
 	for _, f := range files {
 		wg.Add(1)
 
-		go func() {
+		go func(f string) {
 			status, err := getCertStatus(f)
 
 			if err != nil {
 				log.Printf("Error getting certificate status for: %s", f)
-			} else {
+			} else if status != nil {
 				doneChan <- status
 			}
 
 			wg.Done()
-		}()
+		}(f)
 	}
 
 	wg.Wait()
