@@ -19,6 +19,7 @@ var (
 	listenAddr = flag.String("listenAddr", "0.0.0.0:10000", "the address to listen on")
 	watchGlob = flag.String("watch", "./**/cert.pem", "the directories to check for certificates")
 	warningDuration = flag.Duration("warningDuration", time.Hour * 24 * 7, "how long until expiry before a certificate enters 'warning' state")
+	printOkay = flag.Bool("printOkay", false, "if true, certificates that are designated OKAY will also be printed")
 )
 
 func main() {
@@ -108,6 +109,10 @@ func getCertStatus(path string) (*CertStatus, error) {
 	status := "OKAY"
 	if time.Now().After(cert.NotAfter.Add(-*warningDuration)) {
 		status = "WARNING"
+	}
+
+	if !*printOkay && status == "OKAY" {
+		return nil, nil
 	}
 
 	return &CertStatus{
